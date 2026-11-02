@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rep-log-github-pages-v16';
+const CACHE_NAME = 'rep-log-github-pages-v18';
 const APP_ROOT = self.registration.scope;
 const APP_URL = new URL('./index.html', APP_ROOT).pathname;
 const APP_SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'].map(path => new URL(path, APP_ROOT).pathname);
