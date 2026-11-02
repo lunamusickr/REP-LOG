@@ -141,6 +141,7 @@ updateChartExercises();$('chartExercise').onchange=drawChart;$('prevMonth').oncl
     });
     renderInbodyForm(); renderDietForm();
   };
+  setTimeout(() => window.render(), 0);
   window.save = function () {
     if (!isCardio()) { oldSave(); return; }
     const exercise = $('exercise').value, running = exercise === cardioNames[3], mountain = exercise === cardioNames[1];
