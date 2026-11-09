@@ -99,6 +99,7 @@ updateChartExercises();$('chartExercise').onchange=drawChart;$('prevMonth').oncl
   const oldCategoryChange = $('category').onchange;
   const oldExerciseChange = $('exercise').onchange;
   const oldLoadRecentWorkout = $('loadRecentWorkout').onclick;
+  function commitWorkoutEntry(entry){const previous=data,next=editingId?data.map(item=>item.id===editingId?entry:item):[...data,entry];try{localStorage.setItem('rep-log-v1',JSON.stringify(next));data=next;}catch(error){console.error('Workout storage failed:',error);toast('운동 기록 저장에 실패했어요.');return false;}try{resetEditor();resetSetRows();setCardioMode(true);window.render();}catch(error){console.error('Workout display refresh failed after save:',error);try{oldRender();renderTodayByCategory();}catch(renderError){console.error('Workout list fallback failed:',renderError);}}toast('운동 기록을 저장했어요.');return true;}
   const restTimers=new Map(),restControlsStyle=document.createElement('style');restControlsStyle.textContent='.log-list{max-height:none;overflow:visible}.set-row{grid-template-columns:24px minmax(52px,1fr) minmax(52px,1fr) 72px 46px 32px;gap:6px}.set-row input{height:35px;padding:0 8px;font-size:12px}.rest-duration{width:72px;height:35px;padding:0 5px;font-size:11px}.rest-timer{width:46px;height:35px;padding:0 3px;display:flex;align-items:center;justify-content:center;gap:2px;font:10px "DM Mono",monospace}.rest-timer svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}.rest-timer.running{color:var(--lime);border-color:var(--lime2)}@media(max-width:480px){.set-row{grid-template-columns:20px minmax(42px,1fr) minmax(42px,1fr) 62px 42px 30px;gap:4px}.set-row input{padding:0 5px;font-size:11px}.rest-duration{width:62px;padding:0 2px;font-size:10px}.rest-timer{width:42px;font-size:9px}.remove-set{width:30px;height:32px}}';document.head.appendChild(restControlsStyle);
   const clockIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>';
   function decorateSetRows(){
@@ -167,7 +168,7 @@ updateChartExercises();$('chartExercise').onchange=drawChart;$('prevMonth').oncl
   };
   setTimeout(() => window.render(), 0);
   window.save = function () {
-    if (!isCardio()) {const before=data,recordId=editingId,restSeconds=[...$('sets').querySelectorAll('.set-row')].map(row=>Number(row.querySelector('.rest-duration')?.value)||60);oldSave();if(data!==before){const saved=recordId?data.find(item=>item.id===recordId):data.slice().reverse().find(item=>item.date===$('workoutDate').value&&item.category===$('category').value&&item.exercise===$('exercise').value&&!item.cardio);if(saved){saved.restSeconds=restSeconds;localStorage.setItem('rep-log-v1',JSON.stringify(data));window.render();}}return;}
+    if (!isCardio()) {const exercise=$('exercise').value,category=$('category').value,unit=$('weightUnit').value,date=$('workoutDate').value;if(!exercise){toast('운동 종목을 선택해주세요.');return;}const rawRows=[...$('sets').children].map(row=>[...row.querySelectorAll('input')].map(input=>input.value.trim())),filledRows=rawRows.filter(([weight,reps])=>weight!==''||reps!=='');if(!filledRows.length){toast('세트 기록을 입력해주세요.');return;}if(filledRows.some(([weight,reps])=>weight===''||reps===''||!Number.isFinite(Number(weight))||!Number.isFinite(Number(reps))||Number(weight)<0||Number(reps)<1)){toast('무게와 횟수를 올바르게 입력해주세요.');return;}if(!date){toast('운동 날짜를 선택해주세요.');return;}const restSeconds=[...$('sets').querySelectorAll('.set-row')].filter((row,index)=>rawRows[index][0]!==''||rawRows[index][1]!=='').map(row=>Number(row.querySelector('.rest-duration')?.value)||60),entry={id:editingId||(globalThis.crypto?.randomUUID?.()||Date.now()+'-'+Math.random().toString(36).slice(2)),date,category,exercise,unit,sets:filledRows.map(([weight,reps])=>[Number(weight),Number(reps)]),restSeconds};commitWorkoutEntry(entry);return;}
     const exercise = $('exercise').value, running = exercise === cardioNames[3], mountain = exercise === cardioNames[1];
     const intervals=[...cardioFields.querySelectorAll('.cardio-interval-row')].map(row=>Object.fromEntries([...row.querySelectorAll('[data-cardio-field]')].map(input=>[input.dataset.cardioField,input.value.trim()])));
     const cardioIntervals=intervals.map(item=>({...item,incline:mountain?item.incline:'',speed:running?'':item.speed,pace:running?item.pace.replace(/"?\/km$/,''):''}));
@@ -175,10 +176,7 @@ updateChartExercises();$('chartExercise').onchange=drawChart;$('prevMonth').oncl
     const cardio={...cardioIntervals[0],intervals:cardioIntervals};
     const date = $('workoutDate').value;
     const entry = { id: editingId || globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`, date, category: cardioCategory, exercise, unit: 'kg', sets: [], cardio };
-    const previous = data;
-    data = editingId ? data.map(record => record.id === editingId ? entry : record) : [...data, entry];
-    try { localStorage.setItem('rep-log-v1', JSON.stringify(data)); resetEditor(); resetSetRows(); setCardioMode(true); render(); toast('유산소 기록을 저장했어요.'); }
-    catch (error) { data = previous; console.error(error); toast('기록을 저장하지 못했어요.'); }
+    commitWorkoutEntry(entry);
   };
   $('saveWorkout').onclick = () => window.save();
 
@@ -226,7 +224,7 @@ updateChartExercises();$('chartExercise').onchange=drawChart;$('prevMonth').oncl
   function renderDietForm() {
     const date=$('workoutDate').value,saved=diet[date]||{};$('dietDateLabel').textContent=date;
     if(activeDietDate!==date){if(activeDietDate)dietDrafts[activeDietDate]=Object.fromEntries(mealKeys.map(meal=>[meal,activeMeals[meal].map(food=>({...food}))]));activeDietDate=date;activeMeals=dietDrafts[date]?Object.fromEntries(mealKeys.map(meal=>[meal,(dietDrafts[date][meal]||[]).map(food=>({...food}))])):Object.fromEntries(mealKeys.map(meal=>[meal,mealItems(saved[meal]||{},meal)]));}
-    dietDrafts[date]=Object.fromEntries(mealKeys.map(meal=>[meal,activeMeals[meal].map(food=>({...food}))]));localStorage.setItem('rep-diet-drafts-v1',JSON.stringify(dietDrafts));
+    dietDrafts[date]=Object.fromEntries(mealKeys.map(meal=>[meal,activeMeals[meal].map(food=>({...food}))]));try{localStorage.setItem('rep-diet-drafts-v1',JSON.stringify(dietDrafts));}catch(error){console.warn('Diet draft could not be persisted:',error);}
     $('dietMeals').innerHTML=mealKeys.map((meal,i)=>{
       const options='<option value="direct">직접입력</option>'+foodLibrary.map((food,index)=>'<option value="'+index+'">'+esc(food.name)+'</option>').join('');
       const editor='<div class="meal-direct" id="directForm-'+meal+'"><input class="text-input" id="directName-'+meal+'" placeholder="메뉴 이름"><div class="macro-grid" style="margin-top:8px">'+macroKeys.map((key,j)=>'<div class="macro-field"><label for="direct-'+key+'-'+meal+'">'+macroLabels[j]+'</label><input class="macro-input" id="direct-'+key+'-'+meal+'" type="number" min="0" step="0.1"></div>').join('')+'</div></div>';
