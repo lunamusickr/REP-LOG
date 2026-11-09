@@ -67,6 +67,7 @@ updateChartExercises();$('chartExercise').onchange=drawChart;$('prevMonth').oncl
   const cardioNames = ['트레드밀', '마이마운틴', '스텝밀', '러닝'];
   // Keep the calendar outside the tab panels so it can open from any tab.
   document.body.appendChild($('calendarPopover'));
+  $('calendarGrid').addEventListener('click',event=>{if(event.target.closest('.calendar-day'))closeCalendar();},true);
   document.querySelector('.history')?.remove();
   const cardioData = JSON.parse(localStorage.getItem('rep-cardio-ui-v1') || 'null');
   if (!catalog[cardioCategory]) catalog[cardioCategory] = cardioNames.slice();
