@@ -67,6 +67,7 @@ updateChartExercises();$('chartExercise').onchange=drawChart;$('prevMonth').oncl
   const cardioNames = ['트레드밀', '마이마운틴', '스텝밀', '러닝'];
   // Keep the calendar outside the tab panels so it can open from any tab.
   document.body.appendChild($('calendarPopover'));
+  document.querySelector('.history')?.remove();
   const cardioData = JSON.parse(localStorage.getItem('rep-cardio-ui-v1') || 'null');
   if (!catalog[cardioCategory]) catalog[cardioCategory] = cardioNames.slice();
   else cardioNames.forEach(name => { if (!catalog[cardioCategory].includes(name)) catalog[cardioCategory].push(name); });
@@ -132,7 +133,9 @@ updateChartExercises();$('chartExercise').onchange=drawChart;$('prevMonth').oncl
   const oldLoadWorkout = window.loadWorkout;
   window.loadWorkout = function (id) {
     const item = data.find(record => record.id === id);
-    if (!item?.cardio) { oldLoadWorkout(id); return; }
+    if (!item) return;
+    updateChartExercises(item.exercise); $('chartExercise').value=item.exercise; drawChart();
+    if (!item.cardio) { oldLoadWorkout(id); return; }
     editingId = id; $('workoutDate').value = item.date; $('category').value = cardioCategory;
     updateExercises(); $('exercise').value = item.exercise; setCardioMode(false);
     setCardioIntervals(item.cardio.intervals?.length?item.cardio.intervals:[item.cardio]);
@@ -183,10 +186,12 @@ updateChartExercises();$('chartExercise').onchange=drawChart;$('prevMonth').oncl
       const ctx = canvas.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,box.width,box.height);
       const rows = inbody.filter(row => row[key] !== null && row[key] !== '' && Number.isFinite(Number(row[key]))).sort((a,b) => a.date.localeCompare(b.date));
       if (!rows.length) { ctx.fillStyle='#8d9b91'; ctx.textAlign='center'; ctx.fillText('기록이 쌓이면 그래프가 표시됩니다',box.width/2,box.height/2); return; }
-      const vals=rows.map(row=>Number(row[key])),lo=Math.min(...vals),hi=Math.max(...vals),span=hi-lo||1,pad=25;
-      const px=i=>rows.length===1?box.width/2:pad+i*(box.width-2*pad)/(rows.length-1),py=v=>pad+(hi-v)*(box.height-2*pad)/span;
+      const vals=rows.map(row=>Number(row[key]));let lo=Math.floor(Math.min(...vals)*10)/10,hi=Math.ceil(Math.max(...vals)*10)/10;if(hi<=lo){const delta=Math.abs(hi)>=10?0.5:0.1;lo-=delta;hi+=delta;}const plot={l:44,r:12,t:16,b:28},span=hi-lo,height=box.height-plot.t-plot.b,width=box.width-plot.l-plot.r;
+      ctx.font='10px Manrope';ctx.textAlign='right';ctx.textBaseline='middle';ctx.strokeStyle='#2a352e';ctx.fillStyle='#8d9b91';ctx.lineWidth=1;
+      for(let tick=0;tick<=4;tick++){const value=hi-span*tick/4,y=plot.t+height*tick/4;ctx.beginPath();ctx.moveTo(plot.l,y);ctx.lineTo(box.width-plot.r,y);ctx.stroke();ctx.fillText(value.toFixed(1),plot.l-7,y);}
+      const px=i=>rows.length===1?plot.l+width/2:plot.l+i*width/(rows.length-1),py=v=>plot.t+(hi-v)*height/span;
       ctx.beginPath(); rows.forEach((row,i)=>i?ctx.lineTo(px(i),py(Number(row[key]))):ctx.moveTo(px(i),py(Number(row[key])))); ctx.strokeStyle='#c7f36b';ctx.lineWidth=2.5;ctx.stroke();
-      rows.forEach((row,i)=>{ctx.beginPath();ctx.arc(px(i),py(Number(row[key])),4,0,Math.PI*2);ctx.fillStyle='#c7f36b';ctx.fill();ctx.fillStyle='#8d9b91';ctx.font='10px Manrope';ctx.textAlign='center';ctx.fillText(row.date.slice(5),px(i),box.height-5);});
+      rows.forEach((row,i)=>{ctx.beginPath();ctx.arc(px(i),py(Number(row[key])),4,0,Math.PI*2);ctx.fillStyle='#c7f36b';ctx.fill();ctx.fillStyle='#8d9b91';ctx.font='10px Manrope';ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.fillText(row.date.slice(5),px(i),box.height-5);});
     });
     const sorted=inbody.slice().sort((a,b)=>b.date.localeCompare(a.date));
     $('inbodyEntries').innerHTML=sorted.length?sorted.map((row,i)=>{const previous=sorted[i+1];const delta=k=>previous&&row[k]!=null&&previous[k]!=null?`${(Number(row[k])-Number(previous[k])).toFixed(1)} 변화`:'—';return `<div class="inbody-entry"><b>${row.date}</b><span>${row.weight??'—'} kg (${delta('weight')}) · ${row.muscle??'—'} kg (${delta('muscle')}) · ${row.fat??'—'}% (${delta('fat')})</span></div>`}).join(''):'<div class="empty">아직 Inbody 기록이 없어요.</div>';
