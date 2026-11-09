@@ -140,19 +140,20 @@ updateChartExercises();$('chartExercise').onchange=drawChart;$('prevMonth').oncl
     return result.join(' · ');
   }
   function cardioCalories(record){const c=record.cardio||{},intervals=c.intervals?.length?c.intervals:[c];let weight=70;try{const weights=JSON.parse(localStorage.getItem('rep-inbody-v1')||'[]').filter(row=>row.date<=record.date&&Number(row.weight)>0).sort((a,b)=>b.date.localeCompare(a.date));if(weights.length)weight=Number(weights[0].weight);}catch{}return Math.round(intervals.reduce((total,item)=>{const minutes=Number(item.duration)||0;if(!minutes)return total;let met=8.5;const speed=Number(item.speed)||0,grade=(Number(item.incline)||0)/100;const pace=String(item.pace||'').match(/^(\d{2})'(\d{2})/);const runSpeed=pace?3600/(Number(pace[1])*60+Number(pace[2])):speed;const effectiveSpeed=record.exercise===cardioNames[3]?runSpeed:speed;if(record.exercise===cardioNames[2])met=8.5+Math.max(0,speed-3)*0.35;else{const metersPerMinute=effectiveSpeed*1000/60;const vo2=metersPerMinute>=134?0.2*metersPerMinute+0.9*metersPerMinute*grade+3.5:0.1*metersPerMinute+1.8*metersPerMinute*grade+3.5;met=Math.max(2,vo2/3.5);}return total+met*3.5*weight/200*minutes;},0));}
+  function restoreRestSettings(record){setTimeout(()=>{const rows=[...$('sets').querySelectorAll('.set-row')];rows.forEach((row,index)=>{const select=row.querySelector('.rest-duration');if(select)select.value=String(record.restSeconds?.[index]||60);});},0);}
   const oldLoadWorkout = window.loadWorkout;
   window.loadWorkout = function (id) {
     const item = data.find(record => record.id === id);
     if (!item) return;
     updateChartExercises(item.exercise); $('chartExercise').value=item.exercise; drawChart();
-    if (!item.cardio) { oldLoadWorkout(id); return; }
+    if (!item.cardio) { oldLoadWorkout(id); restoreRestSettings(item); return; }
     editingId = id; $('workoutDate').value = item.date; $('category').value = cardioCategory;
     updateExercises(); $('exercise').value = item.exercise; setCardioMode(false);
     setCardioIntervals(item.cardio.intervals?.length?item.cardio.intervals:[item.cardio]);
     $('formTitle').textContent = '유산소 기록 수정'; $('saveWorkout').textContent = '수정 내용 저장';
     $('entryCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-  $('loadRecentWorkout').onclick=()=>{if(!isCardio()){oldLoadRecentWorkout?.();return;}const exercise=$('exercise').value,recent=data.filter(item=>item.category===cardioCategory&&item.exercise===exercise&&item.cardio).sort((a,b)=>b.date.localeCompare(a.date))[0];if(!recent){toast('선택한 유산소 종목의 최근 기록이 없어요.');return;}editingId=null;$('formTitle').textContent='운동 기록 추가';$('saveWorkout').innerHTML='저장&nbsp; ↗';setCardioIntervals(recent.cardio.intervals?.length?recent.cardio.intervals:[recent.cardio]);setCardioMode(false);toast(`${recent.date} 최근 기록을 불러왔어요.`);};
+  $('loadRecentWorkout').onclick=()=>{if(!isCardio()){const exercise=$('exercise').value,category=$('category').value,recent=data.filter(item=>item.category===category&&item.exercise===exercise&&!item.cardio).sort((a,b)=>b.date.localeCompare(a.date))[0];oldLoadRecentWorkout?.();if(recent)restoreRestSettings(recent);return;}const exercise=$('exercise').value,recent=data.filter(item=>item.category===cardioCategory&&item.exercise===exercise&&item.cardio).sort((a,b)=>b.date.localeCompare(a.date))[0];if(!recent){toast('선택한 유산소 종목의 최근 기록이 없어요.');return;}editingId=null;$('formTitle').textContent='운동 기록 추가';$('saveWorkout').innerHTML='저장&nbsp; ↗';setCardioIntervals(recent.cardio.intervals?.length?recent.cardio.intervals:[recent.cardio]);setCardioMode(false);toast(`${recent.date} 최근 기록을 불러왔어요.`);};
   $('category').onchange = () => { oldCategoryChange?.(); setCardioMode(true); };
   $('exercise').onchange = () => { oldExerciseChange?.(); setCardioMode(true); updateChartExercises($('exercise').value); drawChart(); };
 
@@ -166,7 +167,7 @@ updateChartExercises();$('chartExercise').onchange=drawChart;$('prevMonth').oncl
   };
   setTimeout(() => window.render(), 0);
   window.save = function () {
-    if (!isCardio()) { oldSave(); return; }
+    if (!isCardio()) {const before=data,recordId=editingId,restSeconds=[...$('sets').querySelectorAll('.set-row')].map(row=>Number(row.querySelector('.rest-duration')?.value)||60);oldSave();if(data!==before){const saved=recordId?data.find(item=>item.id===recordId):data.slice().reverse().find(item=>item.date===$('workoutDate').value&&item.category===$('category').value&&item.exercise===$('exercise').value&&!item.cardio);if(saved){saved.restSeconds=restSeconds;localStorage.setItem('rep-log-v1',JSON.stringify(data));}}return;}
     const exercise = $('exercise').value, running = exercise === cardioNames[3], mountain = exercise === cardioNames[1];
     const intervals=[...cardioFields.querySelectorAll('.cardio-interval-row')].map(row=>Object.fromEntries([...row.querySelectorAll('[data-cardio-field]')].map(input=>[input.dataset.cardioField,input.value.trim()])));
     const cardioIntervals=intervals.map(item=>({...item,incline:mountain?item.incline:'',speed:running?'':item.speed,pace:running?item.pace.replace(/"?\/km$/,''):''}));
